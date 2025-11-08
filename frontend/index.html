@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Proyecto LF — Interfaz</title>
+  <link rel="stylesheet" href="/frontend/style.css" />
+  
+</head>
+<body>
+  <header class="header">
+    <h1>Proyecto — Lenguajes Formales</h1>
+    <p class="sub">Visualizador educativo: Primeros, Siguientes, LL(1) y SLR(1)</p>
+  </header>
+
+  <main class="container">
+    <section class="panel">
+      <h2>Gramática</h2>
+      <textarea id="gramText" placeholder="S -> aA | b&#10;A -> a | e">S -> aA | b
+A -> a | e</textarea>
+      <div class="row">
+        <button id="btnProcesar" class="btn primary">Procesar gramática</button>
+      </div>
+      <div id="msg" class="msg"></div>
+    </section>
+
+    <section class="panel split" id="results" aria-hidden="true">
+      <div class="col">
+        <h3>Gramática normalizada</h3>
+        <pre id="gramNorm"></pre>
+
+        <h3>Primeros</h3>
+        <div id="primeros"></div>
+      </div>
+
+      <div class="col">
+        <h3>Siguientes</h3>
+        <div id="siguientes"></div>
+
+        <h3>Propiedades</h3>
+        <div id="props"></div>
+      </div>
+
+      <div class="full">
+        <h3>Probar una cadena</h3>
+        <input id="cadena" placeholder="ej: aa" />
+        <button id="btnProbarLL1" class="btn">Probar con LL(1)</button>
+        <button id="btnProbarSLR1" class="btn">Probar con SLR(1)</button>
+        <div id="resultado" class="result"></div>
+      </div>
+
+      <div class="full">
+        <h3>Tablas (resumen)</h3>
+        <div id="tablas"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <small>Hecho para la actividad final — Interfaz educativa</small>
+  </footer>
+ <section class="panel full" id="simulador" aria-hidden="true">
+    <h3>Simulación paso a paso</h3>
+    <div class="sim-container">
+      <div class="sim-section">
+        <h4>Pila</h4>
+        <div id="pila" class="sim-box"></div>
+      </div>
+      <div class="sim-section">
+        <h4>Entrada</h4>
+        <div id="entrada" class="sim-box"></div>
+      </div>
+      <div class="sim-section">
+        <h4>Acción</h4>
+        <div id="accion" class="sim-box"></div>
+      </div>
+    </div>
+    <button id="btnPaso" class="btn">▶ Siguiente paso</button>
+  </section>
+
+  <script src="/frontend/animacion.js"></script>
+  <script src="/frontend/app.js"></script>
+
+</body>
+</html>
