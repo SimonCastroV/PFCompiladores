@@ -194,4 +194,3 @@ if (btnProbarLL1) {
 if (btnProbarSLR1) {
   btnProbarSLR1.addEventListener("click", () => probarCadena("slr1"));
 }
-
