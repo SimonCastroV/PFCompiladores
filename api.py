@@ -113,4 +113,3 @@ async def analizar_gramatica(request: Request):
 @app.get("/api/test")
 def test():
     return {"mensaje": " API funcionando correctamente"}
-
