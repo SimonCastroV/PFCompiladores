@@ -1,6 +1,7 @@
 """
-Analizador LL(1) (top-down).
+Analizador LL(1) (predictivo descendente).
 Construye la tabla LL(1) y permite analizar cadenas.
+Compatible con la clase Gramatica y el cálculo de Primeros/Siguientes.
 """
 
 class AnalizadorLL1:
@@ -17,65 +18,82 @@ class AnalizadorLL1:
             self.error_conflicto = str(e)
             self.tabla_analisis = None
 
+    # ==========================================================
+    #               CONSTRUCCIÓN DE TABLA LL(1)
+    # ==========================================================
     def _construir_tabla(self):
-        tabla = {}
-        for nt in self.gramatica.no_terminales:
-            tabla[nt] = {}
+        tabla = {nt: {} for nt in self.gramatica.no_terminales}
+
         for lhs in self.gramatica.no_terminales:
             for rhs in self.gramatica.obtener_producciones(lhs):
                 primeros_rhs = self._primeros_de_secuencia(rhs)
-                for term in primeros_rhs:
-                    if term != 'e':
-                        if term in tabla[lhs]:
-                            raise ValueError(f"Conflicto LL(1): múltiple predicción para [{lhs}, {term}] — verifica ambigüedad o recursividad izquierda.")
-                        else:
-                            tabla[lhs][term] = rhs
+
+                # Caso normal: símbolos terminales en FIRST(rhs)
+                for term in primeros_rhs - {'e'}:
+                    if term in tabla[lhs]:
+                        raise ValueError(
+                            f"Conflicto LL(1): múltiple predicción para [{lhs}, {term}]"
+                        )
+                    tabla[lhs][term] = rhs
+
+                # Caso especial: producción puede derivar epsilon
                 if 'e' in primeros_rhs:
                     for term in self.siguientes[lhs]:
                         if term in tabla[lhs]:
-                            raise ValueError(f"Conflicto LL(1): múltiple predicción para [{lhs}, {term}] — verifica ambigüedad o recursividad izquierda.")
-                        else:
-                            tabla[lhs][term] = rhs
-        for nt in self.gramatica.no_terminales:
-            for rhs in self.gramatica.obtener_producciones(nt):
-                if len(rhs) > 0 and rhs[0] == nt:
-                    raise ValueError(f"Conflicto LL(1): recursividad izquierda directa en {nt} → {' '.join(rhs)}")
+                            raise ValueError(
+                                f"Conflicto LL(1): múltiple predicción para [{lhs}, {term}]"
+                            )
+                        tabla[lhs][term] = rhs
         return tabla
 
+    # ==========================================================
+    #                 FUNCIONES AUXILIARES
+    # ==========================================================
     def _primeros_de_secuencia(self, secuencia):
+        """
+        Calcula FIRST de una secuencia (rhs) completa.
+        """
         if not secuencia:
             return {'e'}
+
         resultado = set()
-        todos_nulos = True
         for simbolo in secuencia:
-            if simbolo in self.gramatica.terminales:
-                resultado.add(simbolo)
-                todos_nulos = False
-                break
-            for s in self.primeros[simbolo] - {'e'}:
-                resultado.add(s)
+            resultado |= (self.primeros[simbolo] - {'e'})
             if 'e' not in self.primeros[simbolo]:
-                todos_nulos = False
                 break
-        if todos_nulos:
+        else:
             resultado.add('e')
         return resultado
 
     def es_ll1(self):
         return self.tabla_analisis is not None
 
+    # ==========================================================
+    #                     ANÁLISIS LL(1)
+    # ==========================================================
     def analizar(self, cadena_entrada):
+        """
+        Analiza una cadena usando la tabla LL(1).
+        Retorna True si la cadena pertenece al lenguaje.
+        """
         if not self.es_ll1():
             return False
+
         tokens = list(cadena_entrada)
         if not tokens or tokens[-1] != '$':
             tokens.append('$')
+
         pila = ['$', self.gramatica.simbolo_inicio]
         i = 0
+
         while pila:
             cima = pila.pop()
             simbolo = tokens[i] if i < len(tokens) else '$'
-            if cima in self.gramatica.terminales or cima == '$':
+
+            if cima == simbolo == '$':
+                return True
+
+            if cima in self.gramatica.terminales:
                 if cima == simbolo:
                     i += 1
                 else:
@@ -88,4 +106,4 @@ class AnalizadorLL1:
                             pila.append(s)
                 else:
                     return False
-        return (i == len(tokens)) or (i == len(tokens) - 1 and tokens[i] == '$')
+        return False

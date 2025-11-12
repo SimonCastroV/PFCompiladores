@@ -1,6 +1,7 @@
 """
 Analizador SLR(1) (bottom-up).
-Construye colección canónica, tablas ACTION/GOTO y analiza cadenas.
+Construye la colección canónica de ítems LR(0),
+las tablas ACTION y GOTO, y permite analizar cadenas.
 """
 
 class AnalizadorSLR1:
@@ -22,6 +23,9 @@ class AnalizadorSLR1:
             self.tabla_action = None
             self.tabla_goto = None
 
+    # ==========================================================
+    #              CIERRE E IR_A DE ÍTEMS LR(0)
+    # ==========================================================
     def _cierre_items(self, items):
         cierre = set(items)
         cambiado = True
@@ -29,153 +33,142 @@ class AnalizadorSLR1:
             cambiado = False
             nuevos = set()
             for lhs, rhs, pos in cierre:
-                if pos >= len(rhs):
-                    continue
-                simbolo_sig = rhs[pos]
-                if simbolo_sig in self.gramatica.no_terminales:
-                    for rhs_nt in self.gramatica.obtener_producciones(simbolo_sig):
-                        nuevo_item = (simbolo_sig, rhs_nt, 0)
-                        if nuevo_item not in cierre:
-                            nuevos.add(nuevo_item)
-                            cambiado = True
-            cierre.update(nuevos)
+                if pos < len(rhs):
+                    simbolo = rhs[pos]
+                    if simbolo in self.gramatica.no_terminales:
+                        for prod in self.gramatica.obtener_producciones(simbolo):
+                            item = (simbolo, prod, 0)
+                            if item not in cierre:
+                                nuevos.add(item)
+                                cambiado = True
+            cierre |= nuevos
         return cierre
 
     def _ir_a(self, items, simbolo):
-        conjunto = set()
-        for lhs, rhs, pos in items:
-            if pos >= len(rhs):
-                continue
-            if rhs[pos] == simbolo:
-                conjunto.add((lhs, rhs, pos + 1))
-        return self._cierre_items(conjunto)
+        avanzados = {
+            (lhs, rhs, pos + 1)
+            for (lhs, rhs, pos) in items
+            if pos < len(rhs) and rhs[pos] == simbolo
+        }
+        return self._cierre_items(avanzados)
 
+    # ==========================================================
+    #             COLECCIÓN CANÓNICA LR(0)
+    # ==========================================================
     def _construir_coleccion_canonica(self):
-        """
-        Construye la colección canónica LR(0).
-        Excluye el símbolo '$' de la lista de símbolos, ya que no genera transiciones.
-        """
         aumentado_inicio = "S'"
         rhs_inicio = (self.gramatica.simbolo_inicio,)
-        item_inicial = (aumentado_inicio, rhs_inicio, 0)
-        conjunto_inicial = self._cierre_items({item_inicial})
-        coleccion = [conjunto_inicial]
+        inicial = self._cierre_items({(aumentado_inicio, rhs_inicio, 0)})
+
+        coleccion = [inicial]
         pendientes = [0]
 
         while pendientes:
-            idx = pendientes.pop(0)
-            estado = coleccion[idx]
+            i = pendientes.pop(0)
+            estado = coleccion[i]
 
-            # ⚠️ Excluir '$' para evitar falsos conflictos
-            todos_simbolos = [t for t in self.gramatica.terminales if t != '$'] + list(self.gramatica.no_terminales)
+            # ✅ Corrección: unir conjuntos de forma segura
+            todos_simbolos = (self.gramatica.terminales - {'$'}) | set(self.gramatica.no_terminales)
 
             for simbolo in todos_simbolos:
                 goto_set = self._ir_a(estado, simbolo)
-                if goto_set:
-                    for j, existente in enumerate(coleccion):
-                        if goto_set == existente:
-                            break
-                    else:
-                        coleccion.append(goto_set)
-                        pendientes.append(len(coleccion) - 1)
+                if goto_set and goto_set not in coleccion:
+                    coleccion.append(goto_set)
+                    pendientes.append(len(coleccion) - 1)
         return coleccion
 
+    # ==========================================================
+    #              TABLAS ACTION / GOTO
+    # ==========================================================
     def _construir_tablas(self):
-        """
-        Construye las tablas ACTION y GOTO del analizador SLR(1).
-        Detecta conflictos shift/reduce y reduce/reduce.
-        """
         if not self.coleccion_canonica:
             raise ValueError("No se puede construir sin colección canónica")
 
-        action = [{} for _ in range(len(self.coleccion_canonica))]
-        goto = [{} for _ in range(len(self.coleccion_canonica))]
+        n = len(self.coleccion_canonica)
+        action = [{} for _ in range(n)]
+        goto = [{} for _ in range(n)]
+
         transiciones = {}
 
-        # Construir transiciones (GOTO)
+        # Construir transiciones
         for i, estado in enumerate(self.coleccion_canonica):
-            # ⚠️ Excluir '$' en las transiciones
-            for simbolo in [t for t in self.gramatica.terminales if t != '$'] + list(self.gramatica.no_terminales):
+            # ✅ Corrección aquí también
+            for simbolo in (self.gramatica.terminales - {'$'}) | set(self.gramatica.no_terminales):
                 goto_set = self._ir_a(estado, simbolo)
                 if goto_set:
-                    for j, est in enumerate(self.coleccion_canonica):
-                        if goto_set == est:
-                            transiciones[(i, simbolo)] = j
-                            break
+                    j = next((idx for idx, s in enumerate(self.coleccion_canonica) if s == goto_set), None)
+                    if j is not None:
+                        transiciones[(i, simbolo)] = j
 
         # Construir ACTION y GOTO
         for i, estado in enumerate(self.coleccion_canonica):
             for lhs, rhs, pos in estado:
-                # --- Regla shift ---
+                # Shift
                 if pos < len(rhs):
-                    sig = rhs[pos]
-                    if sig in self.gramatica.terminales:
-                        if (i, sig) in transiciones:
-                            j = transiciones[(i, sig)]
-                            if sig in action[i]:
-                                acc_exist, val_exist = action[i][sig]
-                                # Permitir escribir el mismo shift al mismo estado (no es conflicto)
-                                if not (acc_exist == 'shift' and val_exist == j):
-                                    raise ValueError(
-                                        f"Conflicto SLR(1): acción distinta ya definida en estado {i} con símbolo '{sig}'"
-                                    )
-                            else:
-                                action[i][sig] = ('shift', j)
+                    a = rhs[pos]
+                    if a in self.gramatica.terminales:
+                        if (i, a) in transiciones:
+                            j = transiciones[(i, a)]
+                            if a in action[i] and action[i][a] != ('shift', j):
+                                raise ValueError(f"Conflicto shift/reduce en estado {i}, símbolo {a}")
+                            action[i][a] = ('shift', j)
 
-                # --- Regla reduce ---
+                # Reduce o Aceptar
                 else:
                     if lhs == "S'" and rhs == (self.gramatica.simbolo_inicio,):
-                        # Aceptación
-                        if '$' in action[i]:
-                            raise ValueError(f"Conflicto SLR(1): aceptación ambigua en estado {i}")
                         action[i]['$'] = ('accept', None)
                     else:
-                        for term in self.siguientes[lhs]:
-                            if term not in self.gramatica.terminales and term != '$':
+                        for a in self.siguientes[lhs]:
+                            if a not in self.gramatica.terminales and a != '$':
                                 continue
-                            if term in action[i]:
-                                raise ValueError(f"Conflicto SLR(1): reduce/reduce en estado {i} con símbolo '{term}'")
-                            action[i][term] = ('reduce', (lhs, rhs))
+                            if a in action[i]:
+                                raise ValueError(f"Conflicto reduce/reduce en estado {i} con {a}")
+                            action[i][a] = ('reduce', (lhs, rhs))
 
-            # --- GOTO ---
-            for nt in self.gramatica.no_terminales:
-                if (i, nt) in transiciones:
-                    goto[i][nt] = transiciones[(i, nt)]
+            # GOTO
+            for A in self.gramatica.no_terminales:
+                if (i, A) in transiciones:
+                    goto[i][A] = transiciones[(i, A)]
 
         return action, goto
 
+    # ==========================================================
+    #                     ANÁLISIS SLR(1)
+    # ==========================================================
     def es_slr1(self):
         return self.tabla_action is not None and self.tabla_goto is not None
 
     def analizar(self, cadena_entrada):
         if not self.es_slr1():
             return False
+
         tokens = list(cadena_entrada)
         if not tokens or tokens[-1] != '$':
             tokens.append('$')
+
         pila = [0]
         i = 0
+
         while True:
             estado = pila[-1]
-            simbolo = tokens[i] if i < len(tokens) else None
-            if self.tabla_action is None or estado not in range(len(self.tabla_action)) or simbolo not in self.tabla_action[estado]:
+            simbolo = tokens[i]
+
+            if simbolo not in self.tabla_action[estado]:
                 return False
-            accion, objetivo = self.tabla_action[estado][simbolo]
+
+            accion, valor = self.tabla_action[estado][simbolo]
+
             if accion == 'shift':
                 pila.append(simbolo)
-                pila.append(objetivo)
+                pila.append(valor)
                 i += 1
             elif accion == 'reduce':
-                lhs, rhs = objetivo
-                if rhs:
-                    for _ in range(len(rhs) * 2):
-                        pila.pop()
+                lhs, rhs = valor
+                for _ in range(2 * len(rhs)):
+                    pila.pop()
                 estado_actual = pila[-1]
                 pila.append(lhs)
-                if self.tabla_goto is None or estado_actual not in range(len(self.tabla_goto)) or lhs not in self.tabla_goto[estado_actual]:
-                    return False
-                goto_estado = self.tabla_goto[estado_actual][lhs]
-                pila.append(goto_estado)
+                pila.append(self.tabla_goto[estado_actual][lhs])
             elif accion == 'accept':
                 return True
             else:
