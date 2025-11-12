@@ -9,11 +9,13 @@ class AnalizadorLL1:
         self.primeros = primeros
         self.siguientes = siguientes
         self.tabla_analisis = None
+        self.error_conflicto = None
+
         try:
             self.tabla_analisis = self._construir_tabla()
-        except ValueError:
-            # No es LL(1)
-            pass
+        except ValueError as e:
+            self.error_conflicto = str(e)
+            self.tabla_analisis = None
 
     def _construir_tabla(self):
         tabla = {}
@@ -25,15 +27,19 @@ class AnalizadorLL1:
                 for term in primeros_rhs:
                     if term != 'e':
                         if term in tabla[lhs]:
-                            raise ValueError(f"Conflicto LL(1) en [{lhs}, {term}]")
+                            raise ValueError(f"Conflicto LL(1): múltiple predicción para [{lhs}, {term}] — verifica ambigüedad o recursividad izquierda.")
                         else:
                             tabla[lhs][term] = rhs
                 if 'e' in primeros_rhs:
                     for term in self.siguientes[lhs]:
                         if term in tabla[lhs]:
-                            raise ValueError(f"Conflicto LL(1) en [{lhs}, {term}]")
+                            raise ValueError(f"Conflicto LL(1): múltiple predicción para [{lhs}, {term}] — verifica ambigüedad o recursividad izquierda.")
                         else:
                             tabla[lhs][term] = rhs
+        for nt in self.gramatica.no_terminales:
+            for rhs in self.gramatica.obtener_producciones(nt):
+                if len(rhs) > 0 and rhs[0] == nt:
+                    raise ValueError(f"Conflicto LL(1): recursividad izquierda directa en {nt} → {' '.join(rhs)}")
         return tabla
 
     def _primeros_de_secuencia(self, secuencia):

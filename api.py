@@ -35,19 +35,76 @@ def root():
 
 
 # -------------------------------------------------
-# Función auxiliar: parser de texto
+# Función auxiliar: parser de texto con validaciones
 # -------------------------------------------------
 def parsear_gramatica(texto: str):
+    """
+    Parser de gramáticas con validaciones y soporte para símbolos multicaracter.
+    - Verifica formato correcto en cada línea.
+    - Separa tokens por espacios.
+    - 'e' representa epsilon (cadena vacía).
+    """
+    if not texto.strip():
+        raise ValueError("La gramática está vacía. Por favor, ingresa al menos una producción.")
+
     lineas = [l.strip() for l in texto.splitlines() if l.strip()]
     producciones = {}
-    for linea in lineas:
+
+    for i, linea in enumerate(lineas, start=1):
+        # Validar estructura
         if "->" not in linea:
-            raise ValueError(f"Línea inválida: {linea}")
+            raise ValueError(f"Error en línea {i}: falta '->' en '{linea}'")
+
         lhs, rhs = linea.split("->", 1)
         lhs = lhs.strip()
-        rhs = rhs.replace(" ", "")
-        alternativas = [alt.strip() for alt in rhs.split("|")]
-        producciones[lhs] = alternativas
+        rhs = rhs.strip()
+
+        if not lhs:
+            raise ValueError(f"Error en línea {i}: no se especificó el lado izquierdo (LHS).")
+
+        if not rhs:
+            raise ValueError(f"Error en línea {i}: no hay producciones después de '->'.")
+
+        # Validar que el LHS no contenga espacios (solo un símbolo no terminal)
+        if " " in lhs:
+            raise ValueError(f"Error en línea {i}: el no terminal '{lhs}' no debe contener espacios.")
+
+        # Validar caracteres permitidos (letras, dígitos, guión bajo, comillas, paréntesis, etc.)
+        import re
+        if not re.match(r"^[A-Za-z0-9_'\(\)\+\*\-]*$", lhs):
+            raise ValueError(f"Error en línea {i}: el no terminal '{lhs}' contiene caracteres inválidos.")
+
+        alternativas = [alt.strip() for alt in rhs.split("|") if alt.strip()]
+        if not alternativas:
+            raise ValueError(f"Error en línea {i}: no se encontró ninguna alternativa después de '->'.")
+
+        # MERGE de alternativas
+        if lhs not in producciones:
+            producciones[lhs] = []
+
+        for alt in alternativas:
+            if alt == "e":
+                producciones[lhs].append([])  # epsilon
+            else:
+                # Si el usuario separa por espacios, respétalo (soporta tokens multicaracter).
+                # Si NO hay espacios, divide por caracteres (fallback) para casos como "aA".
+                if " " in alt.strip():
+                    tokens = alt.split()
+                else:
+                    tokens = list(alt)  # 'aA' -> ['a', 'A']
+                if any(tok == "epsilon" for tok in tokens):
+                    raise ValueError(f"Error en línea {i}: usa 'e' en lugar de 'epsilon'.")
+                producciones[lhs].append(tokens)
+
+    # Validar duplicados
+    for lhs, rhs_list in producciones.items():
+        seen = set()
+        for rhs in rhs_list:
+            rhs_str = " ".join(rhs)
+            if rhs_str in seen:
+                raise ValueError(f"Producción duplicada detectada: {lhs} -> {rhs_str}")
+            seen.add(rhs_str)
+
     return producciones
 
 
@@ -91,6 +148,17 @@ async def analizar_gramatica(request: Request):
             "aceptada_slr1": None,
         }
 
+        # Agregar mensajes de conflicto (si existen)
+        if hasattr(ll1, "error_conflicto") and ll1.error_conflicto:
+            resultado["detalle_ll1"] = ll1.error_conflicto
+        else:
+            resultado["detalle_ll1"] = None
+
+        if hasattr(slr1, "error_conflicto") and slr1.error_conflicto:
+            resultado["detalle_slr1"] = slr1.error_conflicto
+        else:
+            resultado["detalle_slr1"] = None
+
         # Probar la cadena (si hay)
         if cadena:
             entrada = cadena if cadena.endswith('$') else cadena + '$'
@@ -107,7 +175,11 @@ async def analizar_gramatica(request: Request):
         return JSONResponse(content=resultado)
 
     except Exception as e:
-        return JSONResponse(status_code=400, content={"error": str(e)})
+        mensaje = str(e)
+        # Si el mensaje ya empieza con "Error", no duplicar el prefijo
+        if mensaje.lower().startswith("error"):
+            mensaje = mensaje[6:].strip()  # elimina "Error" o "error" al inicio
+        return JSONResponse(status_code=400, content={"error": f"Error {mensaje}"})
 
 
 @app.get("/api/test")

@@ -11,11 +11,16 @@ class AnalizadorSLR1:
         self.coleccion_canonica = None
         self.tabla_action = None
         self.tabla_goto = None
+        self.error_conflicto = None
+
         try:
             self.coleccion_canonica = self._construir_coleccion_canonica()
             self.tabla_action, self.tabla_goto = self._construir_tablas()
-        except ValueError:
-            pass
+        except ValueError as e:
+            self.error_conflicto = str(e)
+            self.coleccion_canonica = None
+            self.tabla_action = None
+            self.tabla_goto = None
 
     def _cierre_items(self, items):
         cierre = set(items)
@@ -46,21 +51,29 @@ class AnalizadorSLR1:
         return self._cierre_items(conjunto)
 
     def _construir_coleccion_canonica(self):
+        """
+        Construye la colección canónica LR(0).
+        Excluye el símbolo '$' de la lista de símbolos, ya que no genera transiciones.
+        """
         aumentado_inicio = "S'"
         rhs_inicio = (self.gramatica.simbolo_inicio,)
         item_inicial = (aumentado_inicio, rhs_inicio, 0)
         conjunto_inicial = self._cierre_items({item_inicial})
         coleccion = [conjunto_inicial]
         pendientes = [0]
+
         while pendientes:
             idx = pendientes.pop(0)
             estado = coleccion[idx]
-            todos_simbolos = list(self.gramatica.terminales) + list(self.gramatica.no_terminales)
+
+            # ⚠️ Excluir '$' para evitar falsos conflictos
+            todos_simbolos = [t for t in self.gramatica.terminales if t != '$'] + list(self.gramatica.no_terminales)
+
             for simbolo in todos_simbolos:
                 goto_set = self._ir_a(estado, simbolo)
                 if goto_set:
-                    for j, est_existente in enumerate(coleccion):
-                        if goto_set == est_existente:
+                    for j, existente in enumerate(coleccion):
+                        if goto_set == existente:
                             break
                     else:
                         coleccion.append(goto_set)
@@ -68,47 +81,67 @@ class AnalizadorSLR1:
         return coleccion
 
     def _construir_tablas(self):
+        """
+        Construye las tablas ACTION y GOTO del analizador SLR(1).
+        Detecta conflictos shift/reduce y reduce/reduce.
+        """
         if not self.coleccion_canonica:
             raise ValueError("No se puede construir sin colección canónica")
+
         action = [{} for _ in range(len(self.coleccion_canonica))]
         goto = [{} for _ in range(len(self.coleccion_canonica))]
         transiciones = {}
+
+        # Construir transiciones (GOTO)
         for i, estado in enumerate(self.coleccion_canonica):
-            for simbolo in list(self.gramatica.terminales) + list(self.gramatica.no_terminales):
+            # ⚠️ Excluir '$' en las transiciones
+            for simbolo in [t for t in self.gramatica.terminales if t != '$'] + list(self.gramatica.no_terminales):
                 goto_set = self._ir_a(estado, simbolo)
                 if goto_set:
                     for j, est in enumerate(self.coleccion_canonica):
                         if goto_set == est:
                             transiciones[(i, simbolo)] = j
                             break
+
+        # Construir ACTION y GOTO
         for i, estado in enumerate(self.coleccion_canonica):
             for lhs, rhs, pos in estado:
+                # --- Regla shift ---
                 if pos < len(rhs):
                     sig = rhs[pos]
                     if sig in self.gramatica.terminales:
                         if (i, sig) in transiciones:
                             j = transiciones[(i, sig)]
                             if sig in action[i]:
-                                raise ValueError(f"Conflicto SLR(1) en estado {i}, símbolo '{sig}'")
-                            action[i][sig] = ('shift', j)
+                                acc_exist, val_exist = action[i][sig]
+                                # Permitir escribir el mismo shift al mismo estado (no es conflicto)
+                                if not (acc_exist == 'shift' and val_exist == j):
+                                    raise ValueError(
+                                        f"Conflicto SLR(1): acción distinta ya definida en estado {i} con símbolo '{sig}'"
+                                    )
+                            else:
+                                action[i][sig] = ('shift', j)
+
+                # --- Regla reduce ---
                 else:
-                    if lhs == "S'" and pos == 1 and rhs[0] == self.gramatica.simbolo_inicio:
+                    if lhs == "S'" and rhs == (self.gramatica.simbolo_inicio,):
+                        # Aceptación
                         if '$' in action[i]:
-                            raise ValueError(f"Conflicto SLR(1) en estado {i}, símbolo '$'")
+                            raise ValueError(f"Conflicto SLR(1): aceptación ambigua en estado {i}")
                         action[i]['$'] = ('accept', None)
                     else:
                         for term in self.siguientes[lhs]:
+                            if term not in self.gramatica.terminales and term != '$':
+                                continue
                             if term in action[i]:
-                                raise ValueError(f"Conflicto SLR(1) en estado {i}, símbolo '{term}'")
-                            prod_idx = -1
-                            for idx, (p_lhs, p_rhs) in enumerate(self.gramatica.obtener_todas_producciones()):
-                                if p_lhs == lhs and p_rhs == rhs:
-                                    prod_idx = idx
-                                    break
+                                raise ValueError(f"Conflicto SLR(1): reduce/reduce en estado {i} con símbolo '{term}'")
                             action[i][term] = ('reduce', (lhs, rhs))
+
+            # --- GOTO ---
             for nt in self.gramatica.no_terminales:
                 if (i, nt) in transiciones:
                     goto[i][nt] = transiciones[(i, nt)]
+
         return action, goto
 
     def es_slr1(self):
