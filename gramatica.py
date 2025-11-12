@@ -23,7 +23,7 @@ class Gramatica:
         if self.simbolo_inicio not in producciones:
             raise ValueError(f"El símbolo inicial '{self.simbolo_inicio}' no tiene producciones definidas.")
         
-        # Detectar terminales (compatible con tokens multicaracter)
+        # Detectar terminales 
         self.terminales = set()
         for rhs_lista in producciones.values():
             for rhs in rhs_lista:

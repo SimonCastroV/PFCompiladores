@@ -12,23 +12,23 @@ class CalculadorPrimerosSiguientes:
             for nt in self.gramatica.no_terminales
         }
 
-    # ==========================================================
+ 
     #                     CÁLCULO DE PRIMEROS
-    # ==========================================================
+
     def calcular_primeros(self):
         primeros = {}
 
-        # 1️⃣ Inicializar terminales
+        # 1️ Inicializar terminales
         for t in self.gramatica.terminales:
             primeros[t] = {t}
 
-        # 2️⃣ Inicializar no terminales
+        # 2️ Inicializar no terminales
         for nt in self.gramatica.no_terminales:
             primeros[nt] = set()
             if self.gramatica.tiene_produccion_epsilon(nt):
                 primeros[nt].add('e')
 
-        # 3️⃣ Iterar hasta alcanzar punto fijo
+        # 3️ Iterar hasta alcanzar punto fijo
         cambiado = True
         while cambiado:
             cambiado = False

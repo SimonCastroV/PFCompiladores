@@ -51,7 +51,7 @@ function renderResultados(data) {
   // Gramática
   gramNorm.textContent = data.gramatica || "";
 
-  // --- PRIMEROS (estilo libro y agrupados) ---
+  // --- PRIMEROS ---
   primerosDiv.innerHTML = "";
 
   const ordenNoTerminales = [];
@@ -77,7 +77,7 @@ function renderResultados(data) {
       grupos[key].push(simbolo);
     });
 
-    // Crear el texto agrupado en formato tipo libro
+    // Crear el texto agrupado
     let textoFirst = "";
     for (const [key, simbolos] of Object.entries(grupos)) {
       textoFirst += simbolos
