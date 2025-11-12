@@ -44,30 +44,50 @@ function animateElement(el) {
 
 // --- Mostrar resultados en pantalla ---
 function renderResultados(data) {
+  const pretty = (s) => (s === "e" ? "ε" : s);
   resultsPanel.setAttribute("aria-hidden", "false");
 
   // Gramática
   gramNorm.textContent = data.gramatica || "";
 
-  // --- Primeros ---
+  // --- PRIMEROS (orden preservado y color único) ---
   primerosDiv.innerHTML = "";
-  for (const [nt, valores] of Object.entries(data.primeros)) {
-    if (nt === "$") continue; // 👈 oculta FIRST($)
+
+  // ✅ Obtener el orden original de los no terminales desde la gramática normalizada
+  const ordenNoTerminales = [];
+  (data.gramatica || "")
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l.includes("->"))
+    .forEach((l) => {
+      const nt = l.split("->")[0].trim();
+      if (!ordenNoTerminales.includes(nt)) ordenNoTerminales.push(nt);
+    });
+
+  // ✅ Iterar respetando ese orden
+  ordenNoTerminales.forEach((simbolo) => {
+    const valores = data.primeros[simbolo];
+    if (!valores) return;
     const p = document.createElement("p");
-    p.innerHTML = `<strong>${nt}</strong> → { ${valores.join(", ")} }`;
+    p.innerHTML = `<strong class="symbol">${simbolo}</strong> → { ${valores
+      .map(pretty)
+      .join(", ")} }`;
     primerosDiv.appendChild(p);
     animateElement(p);
-  }
+  });
 
-  // --- Siguientes ---
+  // --- SIGUIENTES (mismo orden y color unificado) ---
   siguientesDiv.innerHTML = "";
-  for (const [nt, valores] of Object.entries(data.siguientes)) {
-    if (nt === "$") continue; // 👈 evita mostrar FOLLOW($)
+  ordenNoTerminales.forEach((simbolo) => {
+    const valores = data.siguientes[simbolo];
+    if (!valores) return;
     const p = document.createElement("p");
-    p.innerHTML = `<strong>${nt}</strong> → { ${valores.join(", ")} }`;
+    p.innerHTML = `<strong class="symbol">${simbolo}</strong> → { ${valores
+      .map(pretty)
+      .join(", ")} }`;
     siguientesDiv.appendChild(p);
     animateElement(p);
-  }
+  });
 
   // --- Propiedades generales ---
   propsDiv.innerHTML = "";
@@ -116,7 +136,9 @@ function renderResultados(data) {
   if (!data.es_ll1 && data.detalle_ll1) {
     const err = document.createElement("div");
     err.className = "alerta-conflicto";
-    err.innerHTML = `<span class="icono">⚠️</span> <strong>Conflicto LL(1):</strong> ${data.detalle_ll1.replace("Conflicto LL(1):", "").trim()}`;
+    err.innerHTML = `<span class="icono">⚠️</span> <strong>Conflicto LL(1):</strong> ${data.detalle_ll1
+      .replace("Conflicto LL(1):", "")
+      .trim()}`;
     ll1Info.appendChild(err);
   }
 
@@ -125,7 +147,9 @@ function renderResultados(data) {
   if (!data.es_slr1 && data.detalle_slr1) {
     const err = document.createElement("div");
     err.className = "alerta-conflicto";
-    err.innerHTML = `<span class="icono">⚠️</span> <strong>Conflicto SLR(1):</strong> ${data.detalle_slr1.replace("Conflicto SLR(1):", "").trim()}`;
+    err.innerHTML = `<span class="icono">⚠️</span> <strong>Conflicto SLR(1):</strong> ${data.detalle_slr1
+      .replace("Conflicto SLR(1):", "")
+      .trim()}`;
     slr1Info.appendChild(err);
   }
 
@@ -142,35 +166,58 @@ function renderResultados(data) {
     const table = document.createElement("table");
     table.className = "tabla-analisis";
 
-    // Obtener todos los terminales únicos
-    const terminales = new Set();
+    // Recolectar terminales únicos
+    const terminalesSet = new Set();
     Object.values(data.tabla_ll1).forEach((fila) =>
-      Object.keys(fila).forEach((t) => terminales.add(t))
+      Object.keys(fila).forEach((t) => terminalesSet.add(t))
     );
+
+    // Orden canónico según Aho et al. (id, (, ), *, +, $)
+    const ordenCanonico = ["id", "+", "*", "(", ")", "$"];
+
+    // Si hay terminales adicionales en la gramática, los añadimos al final ordenados alfabéticamente
+    const terminalesDetectados = Array.from(terminalesSet);
+    const terminales = terminalesDetectados.sort((a, b) => {
+      const ia = ordenCanonico.indexOf(a);
+      const ib = ordenCanonico.indexOf(b);
+
+      // Ambos no están en el orden canónico → orden alfabético
+      if (ia === -1 && ib === -1) return a.localeCompare(b);
+
+      // Uno está en el orden canónico → priorizarlo
+      if (ia === -1) return 1;
+      if (ib === -1) return -1;
+
+      // Ambos están en el orden canónico → seguir ese orden
+      return ia - ib;
+    });
 
     // Cabecera
     const thead = document.createElement("thead");
     const headRow = document.createElement("tr");
     headRow.innerHTML =
-      `<th>No terminal</th>` +
-      Array.from(terminales)
-        .map((t) => `<th>${t}</th>`)
-        .join("");
+      `<th>No terminal</th>` + terminales.map((t) => `<th>${t}</th>`).join("");
     thead.appendChild(headRow);
     table.appendChild(thead);
 
     // Filas
     const tbody = document.createElement("tbody");
-    Object.entries(data.tabla_ll1).forEach(([nt, fila]) => {
+    ordenNoTerminales.forEach((nt) => {
+      const fila = data.tabla_ll1[nt];
+      if (!fila) return;
       const tr = document.createElement("tr");
       let html = `<td><strong>${nt}</strong></td>`;
-      Array.from(terminales).forEach((t) => {
-        const regla = fila[t] ? fila[t].join(" ") : "";
-        html += `<td>${regla}</td>`;
+      terminales.forEach((t) => {
+        const produccion = fila[t];
+        let celda = "";
+        if (produccion)
+          celda = produccion.length === 0 ? "ε" : produccion.join(" ");
+        html += `<td>${celda}</td>`;
       });
       tr.innerHTML = html;
       tbody.appendChild(tr);
     });
+
     table.appendChild(tbody);
     cont.appendChild(table);
     tablasDiv.appendChild(cont);
@@ -183,47 +230,89 @@ function renderResultados(data) {
     const table = document.createElement("table");
     table.className = "tabla-analisis";
 
-    // Determinar terminales y no terminales
+    // === ORDEN CANÓNICO DE AHO ===
+    const ordenCanonicoTerm = ["id", "+", "*", "(", ")", "$"];
+
+    // === ORDEN DE NO TERMINALES SEGÚN GRAMÁTICA ===
+    const ordenNoTerm = [];
+    (data.gramatica || "")
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter((l) => l.includes("->"))
+      .forEach((l) => {
+        const nt = l.split("->")[0].trim();
+        if (!ordenNoTerm.includes(nt)) ordenNoTerm.push(nt);
+      });
+
+    // === DETECTAR TERMINALES Y NO TERMINALES ===
     const estados = Object.keys(data.tabla_slr_action);
-    const terminales = new Set();
-    const noTerminales = new Set();
+    const terminalesSet = new Set(ordenCanonicoTerm);
     Object.values(data.tabla_slr_action).forEach((fila) =>
-      Object.keys(fila).forEach((s) => terminales.add(s))
-    );
-    Object.values(data.tabla_slr_goto || {}).forEach((fila) =>
-      Object.keys(fila).forEach((nt) => noTerminales.add(nt))
+      Object.keys(fila).forEach((t) => terminalesSet.add(t))
     );
 
-    // Cabecera combinada
+    const terminales = Array.from(terminalesSet).sort((a, b) => {
+      const ia = ordenCanonicoTerm.indexOf(a);
+      const ib = ordenCanonicoTerm.indexOf(b);
+      if (ia === -1 && ib === -1) return a.localeCompare(b);
+      if (ia === -1) return 1;
+      if (ib === -1) return -1;
+      return ia - ib;
+    });
+
+    // === CABECERA EN DOS NIVELES (ACTION / GOTO) ===
     const thead = document.createElement("thead");
-    const headRow = document.createElement("tr");
-    headRow.innerHTML =
-      `<th>Estado</th>` +
-      Array.from(terminales)
-        .map((t) => `<th>${t}</th>`)
-        .join("") +
-      Array.from(noTerminales)
-        .map((nt) => `<th>${nt}</th>`)
-        .join("");
-    thead.appendChild(headRow);
+
+    // Fila 1: encabezados de secciones
+    const rowTop = document.createElement("tr");
+    rowTop.innerHTML =
+      `<th rowspan="2">STATE</th>` +
+      `<th colspan="${terminales.length}">ACTION</th>` +
+      `<th colspan="${ordenNoTerm.length}">GOTO</th>`;
+    thead.appendChild(rowTop);
+
+    // Fila 2: encabezados de símbolos
+    const rowBottom = document.createElement("tr");
+    rowBottom.innerHTML =
+      terminales.map((t) => `<th>${t}</th>`).join("") +
+      ordenNoTerm.map((nt) => `<th>${nt}</th>`).join("");
+    thead.appendChild(rowBottom);
+
     table.appendChild(thead);
 
-    // Filas con ACTION y GOTO
+    // === CUERPO DE LA TABLA ===
     const tbody = document.createElement("tbody");
     estados.forEach((est) => {
       const tr = document.createElement("tr");
       let html = `<td><strong>${est}</strong></td>`;
-      Array.from(terminales).forEach((t) => {
+
+      // ACTION (terminales)
+      terminales.forEach((t) => {
         const accion = data.tabla_slr_action[est]?.[t];
-        html += `<td>${accion ? accion.join(" ") : ""}</td>`;
+        let valor = "";
+        if (accion) {
+          const tipo = accion[0];
+          if (tipo.startsWith("shift")) {
+            valor = "s" + (accion[1] !== undefined ? accion[1] : "");
+          } else if (tipo.startsWith("reduce")) {
+            valor = "r" + (accion[1] !== undefined ? accion[1] : "");
+          } else if (tipo === "accept") {
+            valor = "acc";
+          }
+        }
+        html += `<td>${valor}</td>`;
       });
-      Array.from(noTerminales).forEach((nt) => {
-        const goto = data.tabla_slr_goto[est]?.[nt];
+
+      // GOTO (no terminales)
+      ordenNoTerm.forEach((nt) => {
+        const goto = data.tabla_slr_goto?.[est]?.[nt];
         html += `<td>${goto !== undefined ? goto : ""}</td>`;
       });
+
       tr.innerHTML = html;
       tbody.appendChild(tr);
     });
+
     table.appendChild(tbody);
     cont.appendChild(table);
     tablasDiv.appendChild(cont);
@@ -355,6 +444,9 @@ if (btnLimpiar) {
     datosAnalisis = null;
 
     // Mostrar mensaje informativo
-    showMessage(" Campos limpiados. Puedes ingresar una nueva gramática.", "info");
+    showMessage(
+      " Campos limpiados. Puedes ingresar una nueva gramática.",
+      "info"
+    );
   });
 }

@@ -79,7 +79,10 @@ class AnalizadorLL1:
         if not self.es_ll1():
             return False
 
-        tokens = list(cadena_entrada)
+        import re
+        SYM_RE = re.compile(r"id|[A-Za-z]+'|[A-Za-z]+|[()+*]|\$")
+        tokens = SYM_RE.findall(cadena_entrada.replace(" ", ""))
+
         if not tokens or tokens[-1] != '$':
             tokens.append('$')
 

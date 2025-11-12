@@ -91,7 +91,9 @@ def parsear_gramatica(texto: str):
                 if " " in alt.strip():
                     tokens = alt.split()
                 else:
-                    tokens = list(alt)  # 'aA' -> ['a', 'A']
+                    import re
+                    TOKEN_RE = re.compile(r"id|[A-Za-z]+'|[A-Za-z]+|[()+*]|\$|ε|e")
+                    tokens = TOKEN_RE.findall(alt.strip())
                 if any(tok == "epsilon" for tok in tokens):
                     raise ValueError(f"Error en línea {i}: usa 'e' en lugar de 'epsilon'.")
                 producciones[lhs].append(tokens)
@@ -133,11 +135,21 @@ async def analizar_gramatica(request: Request):
         ll1 = AnalizadorLL1(g, primeros, siguientes)
         slr1 = AnalizadorSLR1(g, primeros, siguientes)
 
+        # Filtrar solo no terminales para FIRST/FOLLOW
+        primeros_filtrados = {nt: sorted(list(v - {'$'}))
+                              for nt, v in primeros.items()
+                              if nt in g.no_terminales}
+        siguientes_filtrados = {nt: sorted(list(v - {'e', 'ε'}))
+                                for nt, v in siguientes.items()
+                                if nt in g.no_terminales}
+
         # Resultado base
         resultado = {
             "gramatica": str(g),
-            "primeros": {k: sorted(list(v)) for k, v in primeros.items()},
-            "siguientes": {k: sorted(list(v)) for k, v in siguientes.items()},
+            "no_terminales": sorted(list(g.no_terminales)),
+            "terminales": sorted(list(g.terminales - {'$', 'e', 'ε'})),
+            "primeros": primeros_filtrados,
+            "siguientes": siguientes_filtrados,
             "es_ll1": ll1.es_ll1(),
             "es_slr1": slr1.es_slr1(),
             "tabla_ll1": ll1.tabla_analisis if ll1.es_ll1() else {},

@@ -17,7 +17,8 @@ function iniciarSimulacion(data) {
   btnPaso.disabled = false;
 
   if (pasos.length === 0) {
-    accionDiv.textContent = "No se pudo simular esta gramática (faltan tablas).";
+    accionDiv.textContent =
+      "No se pudo simular esta gramática (faltan tablas).";
     btnPaso.disabled = true;
   }
 }
@@ -43,7 +44,7 @@ function generarPasos(data) {
       secuencia.push({
         pila: [...pila],
         entrada: cadena.slice(i),
-        accion: `❌ Error: no hay acción para (${estado}, ${simbolo})`
+        accion: `❌ Error: no hay acción para (${estado}, ${simbolo})`,
       });
       break;
     }
@@ -53,7 +54,7 @@ function generarPasos(data) {
     secuencia.push({
       pila: [...pila],
       entrada: cadena.slice(i),
-      accion: texto
+      accion: texto,
     });
 
     if (tipo === "shift") {
@@ -69,7 +70,7 @@ function generarPasos(data) {
         secuencia.push({
           pila: [...pila],
           entrada: cadena.slice(i),
-          accion: `❌ Error en GOTO(${t}, ${A})`
+          accion: `❌ Error en GOTO(${t}, ${A})`,
         });
         break;
       }
@@ -79,7 +80,7 @@ function generarPasos(data) {
       secuencia.push({
         pila: [...pila],
         entrada: "$",
-        accion: "✅ Cadena aceptada"
+        accion: "✅ Cadena aceptada",
       });
       break;
     }
@@ -103,7 +104,7 @@ if (btnPaso) {
     entradaDiv.textContent = p.entrada;
     accionDiv.textContent = p.accion;
 
-    [pilaDiv, entradaDiv, accionDiv].forEach(el => {
+    [pilaDiv, entradaDiv, accionDiv].forEach((el) => {
       el.classList.remove("highlight");
       setTimeout(() => el.classList.add("highlight"), 100);
     });

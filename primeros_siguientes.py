@@ -98,9 +98,9 @@ class CalculadorPrimerosSiguientes:
                                     cambiado = True
 
                             # Caso 3: si beta ⇒ ε → FOLLOW(nt)
-                            if 'e' in primero_beta:
+                            if 'e' in primero_beta or 'ε' in primero_beta:
                                 for s in siguientes[nt]:
-                                    if s not in siguientes[simbolo]:
+                                    if s not in siguientes[simbolo] and s not in {'e', 'ε'}:
                                         siguientes[simbolo].add(s)
                                         cambiado = True
         return siguientes
