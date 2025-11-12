@@ -230,3 +230,25 @@ pre{background:#f1f5f9;padding:12px;border-radius:8px}
   textarea { height: 100px; }
   .tabla-analisis { font-size: 12px; }
 }
+
+.btn.secondary {
+  background-color: #f5f7fa;
+  color: #1a73e8;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 0.5em 1.2em;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.btn.secondary:hover {
+  background-color: #e8f0fe;
+  border-color: #b0c4ff;
+}
+
+.btn.secondary:active {
+  background-color: #dbeafe;
+  transform: scale(0.98);
+}

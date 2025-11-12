@@ -4,6 +4,7 @@ const btnProbarLL1 = document.getElementById("btnProbarLL1");
 const btnProbarSLR1 = document.getElementById("btnProbarSLR1");
 const gramText = document.getElementById("gramText");
 const cadenaInput = document.getElementById("cadena");
+const btnLimpiar = document.getElementById("btnLimpiar");
 
 const msg = document.getElementById("msg");
 const gramNorm = document.getElementById("gramNorm");
@@ -330,4 +331,30 @@ if (btnProbarLL1) {
 }
 if (btnProbarSLR1) {
   btnProbarSLR1.addEventListener("click", () => probarCadena("slr1"));
+}
+
+// --- Evento: Limpiar todo ---
+if (btnLimpiar) {
+  btnLimpiar.addEventListener("click", () => {
+    // Limpiar todos los campos y resultados
+    gramText.value = "";
+    cadenaInput.value = "";
+    msg.textContent = "";
+    resultadoDiv.textContent = "";
+    gramNorm.textContent = "";
+    primerosDiv.innerHTML = "";
+    siguientesDiv.innerHTML = "";
+    propsDiv.innerHTML = "";
+    tablasDiv.innerHTML = "";
+
+    // Ocultar panel de resultados
+    resultsPanel.setAttribute("aria-hidden", "true");
+
+    // Reiniciar variables globales
+    ultimaGramatica = "";
+    datosAnalisis = null;
+
+    // Mostrar mensaje informativo
+    showMessage(" Campos limpiados. Puedes ingresar una nueva gramática.", "info");
+  });
 }
