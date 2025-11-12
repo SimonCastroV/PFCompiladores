@@ -88,3 +88,4 @@ class Gramatica:
                     partes_rhs.append(' '.join(rhs))
             lineas.append(f"{lhs} -> {' | '.join(partes_rhs)}")
         return '\n'.join(lineas)
+    

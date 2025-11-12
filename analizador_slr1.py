@@ -262,3 +262,4 @@ class AnalizadorSLR1:
 
             # Si ninguna de las anteriores aplicó, error
             return False
+        
