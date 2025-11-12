@@ -76,3 +76,157 @@ pre{background:#f1f5f9;padding:12px;border-radius:8px}
 .result-text.fail {
   color: #dc2626;
 }
+
+.conflict {
+  color: #dc2626;
+  background-color: rgba(220, 38, 38, 0.1);
+  border-left: 4px solid #dc2626;
+  padding: 6px 10px;
+  margin: 6px 0;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+/* ====== TABLAS DE ANÁLISIS ====== */
+.tabla-analisis {
+  border-collapse: collapse;
+  width: 100%;
+  margin-top: 8px;
+  background: #fff;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+  font-family: monospace;
+}
+
+.tabla-analisis th, .tabla-analisis td {
+  border: 1px solid #e2e8f0;
+  padding: 6px 8px;
+  text-align: center;
+}
+
+.tabla-analisis th {
+  background: #f1f5f9;
+  color: #1e293b;
+  font-weight: 600;
+}
+
+.tabla-analisis tr:nth-child(even) {
+  background: #f9fafb;
+}
+
+/* ==== ALERTA DE CONFLICTOS ==== */
+.alerta-conflicto {
+  background-color: #fff5f5;
+  border-left: 4px solid #ef4444;
+  color: #b91c1c;
+  padding: 8px 12px;
+  border-radius: 6px;
+  margin-top: 6px;
+  font-size: 14px;
+  line-height: 1.4;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.alerta-conflicto .icono {
+  font-size: 18px;
+}
+
+/* ====== ALERTA GLOBAL DE RESULTADOS ====== */
+.alerta-global {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  line-height: 1.4;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.alerta-global .icono {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.alerta-roja {
+  background: #fef2f2;
+  border-left: 5px solid #dc2626;
+  color: #b91c1c;
+}
+
+.alerta-amarilla {
+  background: #fffbeb;
+  border-left: 5px solid #f59e0b;
+  color: #92400e;
+}
+
+.alerta-verde {
+  background: #f0fdf4;
+  border-left: 5px solid #16a34a;
+  color: #166534;
+}
+
+/* Mejora la animación general al mostrar resultados */
+#results, #primeros, #siguientes, #props {
+  transition: all 0.3s ease-in-out;
+}
+
+/* Uniformar espaciado interno en secciones de resultados */
+#primeros p, #siguientes p {
+  background: linear-gradient(90deg, #ffffff, #f9fafb);
+  border-radius: 6px;
+  padding: 6px 10px;
+  margin: 4px 0;
+  font-size: 14px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+
+/* Encabezados de las tablas de análisis */
+#tablas h4 {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1e3a8a;
+  margin-bottom: 6px;
+  margin-top: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Estilo para las alertas de conflicto (más consistente con globales) */
+.alerta-conflicto {
+  background-color: #fff7f7;
+  border-left: 4px solid #ef4444;
+  color: #991b1b;
+  padding: 8px 12px;
+  border-radius: 6px;
+  margin-top: 6px;
+  font-size: 14px;
+  line-height: 1.5;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  animation: fadeIn 0.4s ease-in;
+}
+
+/* Ajuste visual de los mensajes globales */
+.alerta-global {
+  animation: fadeIn 0.4s ease-in;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+}
+
+/* Colores más vibrantes para los íconos de estado */
+.alerta-roja .icono { color: #dc2626; }
+.alerta-amarilla .icono { color: #f59e0b; }
+.alerta-verde .icono { color: #16a34a; }
+
+/* En pantallas pequeñas, mantener proporción */
+@media (max-width: 768px) {
+  .container { flex-direction: column; padding: 16px; }
+  .panel { width: 100%; }
+  textarea { height: 100px; }
+  .tabla-analisis { font-size: 12px; }
+}
