@@ -130,6 +130,9 @@ class AnalizadorSLR1:
     # ==========================
     #    Construcción SLR(1)
     # ==========================
+        # ==========================
+    #    Construcción SLR(1)
+    # ==========================
     def _construir_tablas_slr(self):
         """
         ACTION y GOTO según SLR(1):
@@ -139,13 +142,25 @@ class AnalizadorSLR1:
         """
         conflictos = []
 
+        # ==========================
+        # Numerar producciones según el orden original de la gramática
+        # ==========================
+        self.producciones_numeradas = []
+        self.prod_index = {}
+
+        for idx, (A, rhs) in enumerate(self.g.obtener_todas_producciones(), start=1):
+            self.producciones_numeradas.append((A, rhs))
+            self.prod_index[(A, tuple(rhs))] = idx
+
+        # ==========================
         # Conjuntos útiles
+        # ==========================
         terminals = set(self.g.terminales) - {'$'}   # agregaremos $ aparte para accept
         terminals.add('$')  # para accept
 
         for i, I in enumerate(self.items):
+
             # 1) shifts por terminales
-            # si (i, a) existe transición, ACTION[i,a] = shift j
             for a in terminals:
                 if (i, a) in self.transitions:
                     j = self.transitions[(i, a)]
@@ -160,28 +175,35 @@ class AnalizadorSLR1:
 
             # 3) reducciones y accept
             for (A, rhs, dot) in I:
-                # A -> α •    (punto al final)
+                # A -> α • (punto al final)
                 if dot == len(rhs):
                     if A == self.aug_inicio:
-                        # S' -> S •  ⇒ accept sobre $
+                        # S' -> S • ⇒ accept sobre $
                         self._add_action(i, '$', "accept", conflictos)
                         continue
 
                     # reduce A -> rhs sobre cada a ∈ FOLLOW(A)
-                    rhs_texto = " ".join(rhs) if len(rhs) > 0 else "e"
-                    acc = f"reduce {A},{rhs_texto}"
-                    for a in self.follow.get(A, set()):
+                    rhs_texto = " ".join(rhs) if rhs else "e"
+
+                    # buscar número de producción en el mapa
+                    num_prod = self.prod_index.get((A, tuple(rhs)))
+                    if num_prod is None:
+                        acc = f"reduce ? ({A} -> {rhs_texto})"
+                    else:
+                        acc = f"reduce {num_prod}"
+
+                    for a in sorted(self.follow.get(A, set())):
                         self._add_action(i, a, acc, conflictos)
 
         # Guardar conflictos si hubo
         if conflictos:
-            # mensaje compacto (primer conflicto)
             self.error_conflicto = conflictos[0]
 
         # Eliminar llaves vacías en ACTION
         for i in range(len(self.items)):
             self.tabla_action[i] = dict(self.tabla_action[i])
 
+    # -------------------------------------------------
     def _add_action(self, i, a, accion, conflictos):
         """
         Inserta una acción en ACTION[i][a] detectando conflictos S/R o R/R.

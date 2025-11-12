@@ -300,16 +300,21 @@ function renderResultados(data) {
       terminales.forEach((t) => {
         const accion = data.tabla_slr_action[est]?.[t];
         let valor = "";
-        if (accion) {
-          const tipo = accion[0];
-          if (tipo.startsWith("shift")) {
-            valor = "s" + (accion[1] !== undefined ? accion[1] : "");
-          } else if (tipo.startsWith("reduce")) {
-            valor = "r" + (accion[1] !== undefined ? accion[1] : "");
-          } else if (tipo === "accept") {
+        if (accion && accion.length > 0) {
+          const act = accion[0];
+          if (act.startsWith("shift")) {
+            // ejemplo: "shift 5"
+            const num = act.split(" ")[1] || "";
+            valor = "s" + num;
+          } else if (act.startsWith("reduce")) {
+            // ejemplo: "reduce 3"
+            const num = act.split(" ")[1] || "";
+            valor = "r" + num;
+          } else if (act === "accept") {
             valor = "acc";
           }
         }
+
         html += `<td>${valor}</td>`;
       });
 
