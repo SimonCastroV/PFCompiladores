@@ -15,6 +15,7 @@ const resultadoDiv = document.getElementById("resultado");
 const tablasDiv = document.getElementById("tablas");
 
 const resultsPanel = document.getElementById("results");
+const ordenCanonicoTerm = ["id", "+", "*", "(", ")", "$"];
 
 // --- Variables globales ---
 let ultimaGramatica = "";
@@ -50,10 +51,9 @@ function renderResultados(data) {
   // Gramática
   gramNorm.textContent = data.gramatica || "";
 
-  // --- PRIMEROS (orden preservado y color único) ---
+  // --- PRIMEROS (estilo libro y agrupados) ---
   primerosDiv.innerHTML = "";
 
-  // ✅ Obtener el orden original de los no terminales desde la gramática normalizada
   const ordenNoTerminales = [];
   (data.gramatica || "")
     .split(/\r?\n/)
@@ -62,34 +62,74 @@ function renderResultados(data) {
     .forEach((l) => {
       const nt = l.split("->")[0].trim();
       if (!ordenNoTerminales.includes(nt)) ordenNoTerminales.push(nt);
+  });
+
+  if (data.primeros && Object.keys(data.primeros).length > 0) {
+    const pretty = (s) => (s === "e" ? "ε" : s);
+    const grupos = {};
+
+    // Agrupar los no terminales que comparten el mismo conjunto de primeros
+    ordenNoTerminales.forEach((simbolo) => {
+      const valores = data.primeros[simbolo];
+      if (!valores) return;
+      const key = valores.map(pretty).join(", ");
+      if (!grupos[key]) grupos[key] = [];
+      grupos[key].push(simbolo);
     });
 
-  // ✅ Iterar respetando ese orden
-  ordenNoTerminales.forEach((simbolo) => {
-    const valores = data.primeros[simbolo];
-    if (!valores) return;
-    const p = document.createElement("p");
-    p.innerHTML = `<strong class="symbol">${simbolo}</strong> → { ${valores
-      .map(pretty)
-      .join(", ")} }`;
-    primerosDiv.appendChild(p);
-    animateElement(p);
-  });
+    // Crear el texto agrupado en formato tipo libro
+    let textoFirst = "";
+    for (const [key, simbolos] of Object.entries(grupos)) {
+      textoFirst += simbolos
+        .map((s, i) => (i === 0 ? `FIRST(${s})` : ` = FIRST(${s})`))
+        .join("");
+      textoFirst += ` = { ${key} }\n`;
+    }
 
-  // --- SIGUIENTES (mismo orden y color unificado) ---
+    // Mostrar el bloque de resultado
+    const pre = document.createElement("pre");
+    pre.className = "resultado-texto";
+    pre.textContent = textoFirst.trim();
+    primerosDiv.appendChild(pre);
+  }
+
+  // --- SIGUIENTES (orden tipo libro: *, +, ), $) ---
   siguientesDiv.innerHTML = "";
-  ordenNoTerminales.forEach((simbolo) => {
-    const valores = data.siguientes[simbolo];
-    if (!valores) return;
-    const p = document.createElement("p");
-    p.innerHTML = `<strong class="symbol">${simbolo}</strong> → { ${valores
-      .map(pretty)
-      .join(", ")} }`;
-    siguientesDiv.appendChild(p);
-    animateElement(p);
-  });
+  if (data.siguientes && Object.keys(data.siguientes).length > 0) {
+    let textoFollow = "";
 
-  // --- Propiedades generales ---
+    const grupos = {};
+    ordenNoTerminales.forEach((simbolo) => {
+      const valores = data.siguientes[simbolo];
+      if (!valores) return;
+
+      // --- Orden tipo libro ---
+      const ordenCanonico = ["*", "+", ")", "$"];
+      const restantes = valores.filter((v) => !ordenCanonico.includes(v)).sort();
+      const ordenados = [
+        ...ordenCanonico.filter((x) => valores.includes(x)),
+        ...restantes
+      ];
+
+      const key = ordenados.map((s) => (s === "e" ? "ε" : s)).join(", ");
+      if (!grupos[key]) grupos[key] = [];
+      grupos[key].push(simbolo);
+    });
+
+    for (const [key, simbolos] of Object.entries(grupos)) {
+      textoFollow += simbolos
+        .map((s) => `FOLLOW(${s})`)
+        .join(" = ");
+      textoFollow += ` = { ${key} }\n`;
+    }
+
+    const pre = document.createElement("pre");
+    pre.className = "resultado-texto";
+    pre.textContent = textoFollow.trim();
+    siguientesDiv.appendChild(pre);
+  }
+
+  // --- Propiedades ---
   propsDiv.innerHTML = "";
   const alerta = document.createElement("div");
   alerta.className = "alerta-global";
@@ -156,7 +196,7 @@ function renderResultados(data) {
   propsDiv.appendChild(ll1Info);
   propsDiv.appendChild(slr1Info);
 
-  // Tablas
+  // --- Tablas ---
   tablasDiv.innerHTML = "";
 
   // ====== TABLA LL(1) ======
@@ -166,33 +206,22 @@ function renderResultados(data) {
     const table = document.createElement("table");
     table.className = "tabla-analisis";
 
-    // Recolectar terminales únicos
     const terminalesSet = new Set();
     Object.values(data.tabla_ll1).forEach((fila) =>
       Object.keys(fila).forEach((t) => terminalesSet.add(t))
     );
 
-    // Orden canónico según Aho et al. (id, (, ), *, +, $)
     const ordenCanonico = ["id", "+", "*", "(", ")", "$"];
-
-    // Si hay terminales adicionales en la gramática, los añadimos al final ordenados alfabéticamente
     const terminalesDetectados = Array.from(terminalesSet);
     const terminales = terminalesDetectados.sort((a, b) => {
       const ia = ordenCanonico.indexOf(a);
       const ib = ordenCanonico.indexOf(b);
-
-      // Ambos no están en el orden canónico → orden alfabético
       if (ia === -1 && ib === -1) return a.localeCompare(b);
-
-      // Uno está en el orden canónico → priorizarlo
       if (ia === -1) return 1;
       if (ib === -1) return -1;
-
-      // Ambos están en el orden canónico → seguir ese orden
       return ia - ib;
     });
 
-    // Cabecera
     const thead = document.createElement("thead");
     const headRow = document.createElement("tr");
     headRow.innerHTML =
@@ -200,7 +229,6 @@ function renderResultados(data) {
     thead.appendChild(headRow);
     table.appendChild(thead);
 
-    // Filas
     const tbody = document.createElement("tbody");
     ordenNoTerminales.forEach((nt) => {
       const fila = data.tabla_ll1[nt];
@@ -230,21 +258,9 @@ function renderResultados(data) {
     const table = document.createElement("table");
     table.className = "tabla-analisis";
 
-    // === ORDEN CANÓNICO DE AHO ===
     const ordenCanonicoTerm = ["id", "+", "*", "(", ")", "$"];
+    const ordenNoTerm = ordenNoTerminales;
 
-    // === ORDEN DE NO TERMINALES SEGÚN GRAMÁTICA ===
-    const ordenNoTerm = [];
-    (data.gramatica || "")
-      .split(/\r?\n/)
-      .map((l) => l.trim())
-      .filter((l) => l.includes("->"))
-      .forEach((l) => {
-        const nt = l.split("->")[0].trim();
-        if (!ordenNoTerm.includes(nt)) ordenNoTerm.push(nt);
-      });
-
-    // === DETECTAR TERMINALES Y NO TERMINALES ===
     const estados = Object.keys(data.tabla_slr_action);
     const terminalesSet = new Set(ordenCanonicoTerm);
     Object.values(data.tabla_slr_action).forEach((fila) =>
@@ -260,10 +276,7 @@ function renderResultados(data) {
       return ia - ib;
     });
 
-    // === CABECERA EN DOS NIVELES (ACTION / GOTO) ===
     const thead = document.createElement("thead");
-
-    // Fila 1: encabezados de secciones
     const rowTop = document.createElement("tr");
     rowTop.innerHTML =
       `<th rowspan="2">STATE</th>` +
@@ -271,7 +284,6 @@ function renderResultados(data) {
       `<th colspan="${ordenNoTerm.length}">GOTO</th>`;
     thead.appendChild(rowTop);
 
-    // Fila 2: encabezados de símbolos
     const rowBottom = document.createElement("tr");
     rowBottom.innerHTML =
       terminales.map((t) => `<th>${t}</th>`).join("") +
@@ -280,13 +292,11 @@ function renderResultados(data) {
 
     table.appendChild(thead);
 
-    // === CUERPO DE LA TABLA ===
     const tbody = document.createElement("tbody");
     estados.forEach((est) => {
       const tr = document.createElement("tr");
       let html = `<td><strong>${est}</strong></td>`;
 
-      // ACTION (terminales)
       terminales.forEach((t) => {
         const accion = data.tabla_slr_action[est]?.[t];
         let valor = "";
@@ -303,7 +313,6 @@ function renderResultados(data) {
         html += `<td>${valor}</td>`;
       });
 
-      // GOTO (no terminales)
       ordenNoTerm.forEach((nt) => {
         const goto = data.tabla_slr_goto?.[est]?.[nt];
         html += `<td>${goto !== undefined ? goto : ""}</td>`;
@@ -345,12 +354,7 @@ if (btnProcesar) {
         renderResultados(data);
         showMessage("✅ Gramática procesada correctamente.", "success");
       } else {
-        let mensaje = data.error || "Error desconocido";
-        if (mensaje.toLowerCase().startsWith("error")) {
-          showMessage(mensaje, "error");
-        } else {
-          showMessage("Error: " + mensaje, "error");
-        }
+        showMessage("Error: " + (data.error || "Error desconocido"), "error");
       }
     } catch (err) {
       console.error(err);
@@ -385,28 +389,20 @@ async function probarCadena(tipo) {
 
     const data = await res.json();
     if (res.ok) {
-      let aceptado = false;
-      if (tipo === "ll1") aceptado = data.aceptada_ll1;
-      else aceptado = data.aceptada_slr1;
+      const aceptado =
+        tipo === "ll1" ? data.aceptada_ll1 : data.aceptada_slr1;
 
       resultadoDiv.innerHTML = `
         <p class="result-text ${aceptado ? "ok" : "fail"}">${
         aceptado ? "✅ Cadena aceptada" : "❌ Cadena rechazada"
-      }</p>
-      `;
+      }</p>`;
       animateElement(resultadoDiv);
 
-      // ✅ Aquí sí existe "data", así que la simulación funcionará
       if (tipo === "slr1" && data.es_slr1) {
         iniciarSimulacion(data);
       }
     } else {
-      let mensaje = data.error || "Error desconocido";
-      if (mensaje.toLowerCase().startsWith("error")) {
-        showMessage(mensaje, "error");
-      } else {
-        showMessage("Error: " + mensaje, "error");
-      }
+      showMessage("Error: " + (data.error || "Error desconocido"), "error");
     }
   } catch (err) {
     console.error(err);
@@ -425,7 +421,6 @@ if (btnProbarSLR1) {
 // --- Evento: Limpiar todo ---
 if (btnLimpiar) {
   btnLimpiar.addEventListener("click", () => {
-    // Limpiar todos los campos y resultados
     gramText.value = "";
     cadenaInput.value = "";
     msg.textContent = "";
@@ -435,18 +430,9 @@ if (btnLimpiar) {
     siguientesDiv.innerHTML = "";
     propsDiv.innerHTML = "";
     tablasDiv.innerHTML = "";
-
-    // Ocultar panel de resultados
     resultsPanel.setAttribute("aria-hidden", "true");
-
-    // Reiniciar variables globales
     ultimaGramatica = "";
     datosAnalisis = null;
-
-    // Mostrar mensaje informativo
-    showMessage(
-      " Campos limpiados. Puedes ingresar una nueva gramática.",
-      "info"
-    );
+    showMessage("Campos limpiados. Puedes ingresar una nueva gramática.", "info");
   });
 }
