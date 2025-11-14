@@ -2,7 +2,7 @@
 
 uvicorn api:app --reload
 
-## integrantes ##
+## Integrantes ##
 - Alberto Daniel Cervantes 
 - Andres Alarcon Rojas
 - Simon Castro Valencia
